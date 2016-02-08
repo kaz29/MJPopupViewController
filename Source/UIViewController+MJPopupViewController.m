@@ -86,6 +86,37 @@ static void * const keypath = (void*)&keypath;
     }
 }
 
+- (void)presentPopupViewControllerToTop:(UIViewController*)popupViewController animationType:(MJPopupViewAnimation)animationType
+{
+    self.mj_popupViewController = popupViewController;
+    [self presentPopupViewToTop:popupViewController.view animationType:animationType];
+}
+
+- (void)dismissPopupViewControllerFromTopWithanimationType:(MJPopupViewAnimation)animationType
+{
+    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+    UIView *sourceView = window;
+    UIView *popupView = [sourceView viewWithTag:kMJPopupViewTag];
+    UIView *overlayView = [sourceView viewWithTag:kMJOverlayViewTag];
+    
+    switch (animationType) {
+        case MJPopupViewAnimationSlideBottomTop:
+        case MJPopupViewAnimationSlideBottomBottom:
+        case MJPopupViewAnimationSlideTopTop:
+        case MJPopupViewAnimationSlideTopBottom:
+        case MJPopupViewAnimationSlideLeftLeft:
+        case MJPopupViewAnimationSlideLeftRight:
+        case MJPopupViewAnimationSlideRightLeft:
+        case MJPopupViewAnimationSlideRightRight:
+            [self slideViewOut:popupView sourceView:sourceView overlayView:overlayView withAnimationType:animationType];
+            break;
+            
+        default:
+            [self fadeViewOut:popupView sourceView:sourceView overlayView:overlayView];
+            break;
+    }
+    self.mj_popupViewController = nil;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -160,6 +191,69 @@ static void * const keypath = (void*)&keypath;
     }
     
     [self setDismissedCallback:dismissed];
+}
+
+- (void)presentPopupViewToTop:(UIView*)popupView animationType:(MJPopupViewAnimation)animationType
+{
+    UIView *sourceView = [self topView];
+    sourceView.tag = kMJSourceViewTag;
+    popupView.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleLeftMargin |UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin;
+    popupView.tag = kMJPopupViewTag;
+    
+    // check if source view controller is not in destination
+    if ([sourceView.subviews containsObject:popupView]) return;
+    
+    // customize popupView
+    popupView.layer.shadowPath = [UIBezierPath bezierPathWithRect:popupView.bounds].CGPath;
+    popupView.layer.masksToBounds = NO;
+    popupView.layer.shadowOffset = CGSizeMake(5, 5);
+    popupView.layer.shadowRadius = 5;
+    popupView.layer.shadowOpacity = 0.5;
+    
+    // Add semi overlay
+    UIView *overlayView = [[UIView alloc] initWithFrame:sourceView.bounds];
+    overlayView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    overlayView.tag = kMJOverlayViewTag;
+    overlayView.backgroundColor = [UIColor clearColor];
+    
+    // BackgroundView
+    self.mj_popupBackgroundView = [[MJPopupBackgroundView alloc] initWithFrame:sourceView.bounds];
+    self.mj_popupBackgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.mj_popupBackgroundView.backgroundColor = [UIColor clearColor];
+    self.mj_popupBackgroundView.alpha = 0.0f;
+    [overlayView addSubview:self.mj_popupBackgroundView];
+    
+    // Make the Background Clickable
+    UIButton * dismissButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    dismissButton.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    dismissButton.backgroundColor = [UIColor clearColor];
+    dismissButton.frame = sourceView.bounds;
+    [overlayView addSubview:dismissButton];
+    
+    popupView.alpha = 0.0f;
+    [overlayView addSubview:popupView];
+    
+    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+    [window addSubview:overlayView];
+    
+    [dismissButton addTarget:self action:@selector(dismissPopupViewControllerFromTopWithanimationType:) forControlEvents:UIControlEventTouchUpInside];
+    switch (animationType) {
+        case MJPopupViewAnimationSlideBottomTop:
+        case MJPopupViewAnimationSlideBottomBottom:
+        case MJPopupViewAnimationSlideTopTop:
+        case MJPopupViewAnimationSlideTopBottom:
+        case MJPopupViewAnimationSlideLeftLeft:
+        case MJPopupViewAnimationSlideLeftRight:
+        case MJPopupViewAnimationSlideRightLeft:
+        case MJPopupViewAnimationSlideRightRight:
+            dismissButton.tag = animationType;
+            [self slideViewIn:popupView sourceView:sourceView overlayView:overlayView withAnimationType:animationType];
+            break;
+        default:
+            dismissButton.tag = MJPopupViewAnimationFade;
+            [self fadeViewIn:popupView sourceView:sourceView overlayView:overlayView];
+            break;
+    }
 }
 
 -(UIView*)topView {
